@@ -1,5 +1,10 @@
 package top.openyuan.sdt.cipher.enums;
 
+/**
+ * 加密器类型
+ *
+ * @author lzy
+ */
 public enum CipherType {
     /********************* 非对称加解密算法 *************************/
     RSA("RSA"),

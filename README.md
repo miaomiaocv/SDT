@@ -1,163 +1,149 @@
 [![JavaDoc](http://img.shields.io/badge/javadoc-reference-blue.svg)](https://www.javadoc.io/doc/com.github.wechatpay-apiv3/wechatpay-java/latest/index.html)
 
-# 合利宝支付 APIv3 Java SDK
+# SDT APIv1 Java SDK
 
-[合利宝支付 APIv3](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/introduction.html) 官方 Java 语言客户端开发库。
+[SDT APIv1](http://192.168.42.37/liangzhengyuan/SDT) 客户端开发库。
 
 开发库由 `core` 和 `service` 组成：
 
-- core 为基础库，包含自动签名和验签的 HTTP 客户端、回调处理、加解密库。
+- core 为基础库（可以扩展其他项目SDK），包含自动签名和验签的 HTTP 客户端、回调处理、加解密库。
 - service 为业务服务，包含[业务接口](service/src/main/java/com/wechat/pay/java/service)和[使用示例](service/src/example/java/com/wechat/pay/java/service)。
 
 ## 前置条件
 
 - Java 1.8+。
-- [成为合利宝支付商户](https://pay.weixin.qq.com/index.php/apply/applyment_home/guide_normal)。
-- [商户 API 证书](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/privatekey-and-certificate.html#%E5%95%86%E6%88%B7api%E8%AF%81%E4%B9%A6)：指由商户申请的，包含[证书序列号](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/certificate-faqs.html#%E5%A6%82%E4%BD%95%E6%9F%A5%E7%9C%8B%E8%AF%81%E4%B9%A6%E5%BA%8F%E5%88%97%E5%8F%B7)、商户的商户号、公司名称、公钥信息的证书。
-- [商户 API 私钥](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/privatekey-and-certificate.html#%E5%95%86%E6%88%B7api%E7%A7%81%E9%92%A5)：商户申请商户API证书时，会生成商户私钥，并保存在本地证书文件夹的文件 apiclient_key.pem 中。
-- [APIv3 密钥](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/apiv3key.html)：为了保证安全性，合利宝支付在回调通知和平台证书下载接口中，对关键信息进行了 AES-256-GCM 加密。APIv3 密钥是加密时使用的对称密钥。
+- [成为SDT商户]： 开通SDT商户账号。
+- [SDT公钥]：开通SDT商户账号之后，会提供SDT公钥。
+- [商户公钥]：需要自主生成公钥，sdk也提供生成公钥的方法，如下例子。
+- [商户私钥]：需要自主生成私钥，sdk也提供生成私钥的方法，如下例子。
 
 ## 快速开始
 
 ### 安装
 
-最新版本已经在 [Maven Central](https://search.maven.org/artifact/com.github.wechatpay-apiv3/wechatpay-java) 发布。
+最新版本没有在 [Maven Central](https://search.maven.org/artifact/top.openyuan/SDT) 发布。
 
 #### Gradle
 
-在你的 build.gradle 文件中加入如下的依赖
+预计路径：在你的 build.gradle 文件中加入如下的依赖
 
 ```groovy
-implementation 'com.github.wechatpay-apiv3:wechatpay-java:0.2.10'
+implementation 'top.openyuan:SDT:0.0.1'
 ```
 
 #### Maven
 
-加入以下依赖
+预计路径：加入以下依赖
 
 ```xml
 <dependency>
-  <groupId>com.github.wechatpay-apiv3</groupId>
-  <artifactId>wechatpay-java</artifactId>
-  <version>0.2.10</version>
+  <groupId>top.openyuan</groupId>
+  <artifactId>SDT</artifactId>
+  <version>0.0.1</version>
 </dependency>
+```
+### 生成商户密钥对方法
+以生成商户的密钥对为例，先初始化 `HeLiPayKeyPairGenerator`SDT密钥生成器，再调用 `createKeyPair`方法即可生成密钥对。
+```java
+package top.openyuan.java.service.cipher;
+
+import top.openyuan.java.core.cipher.HeLiPayKeyPairGenerator;
+import top.openyuan.java.core.keypair.KeyPairGenerator;
+import top.openyuan.java.core.keypair.model.KeyPair;
+import org.junit.Test;
+
+public class HeLiPayKeyPairGeneratorTest {
+    @Test
+    public static void createHeLiPayKeyPair() {
+        // 初始化SDT密钥生成器
+        KeyPairGenerator keyPairGenerator = new HeLiPayKeyPairGenerator();
+        // 生成密钥对
+        KeyPair keyPair = keyPairGenerator.createKeyPair();
+        
+        System.out.println(String.format("公钥：{}", keyPair.getPublicKey()));
+        System.out.println(String.format("私钥：{}", keyPair.getPrivateKey()));
+    }
+}
 ```
 
 ### 调用业务请求接口
 
-以 Native 支付下单为例，先补充商户号等必要参数以构建 `config`，再构建 `service` 即可调用 `prepay()` 发送请求。
+以SDT查询用户状态为例，先补充商户号等必要参数以构建 `config`，再构建 `service` 即可调用 `queryUser()` 发送请求。
 
 ```java
-package com.wechat.pay.java.service;
+package top.openyuan.java.service.user;
 
-import com.wechat.pay.java.core.Config;
-import com.wechat.pay.java.core.RSAAutoCertificateConfig;
-import com.wechat.pay.java.service.payments.nativepay.NativePayService;
-import com.wechat.pay.java.service.payments.nativepay.model.Amount;
-import com.wechat.pay.java.service.payments.nativepay.model.PrepayRequest;
-import com.wechat.pay.java.service.payments.nativepay.model.PrepayResponse;
+import top.openyuan.java.core.exception.HttpException;
+import top.openyuan.java.core.exception.MalformedMessageException;
+import top.openyuan.java.core.exception.ServiceException;
+import top.openyuan.java.core.config.HeLiPayConfig;
+import top.openyuan.java.service.realname.UserService;
+import top.openyuan.java.service.realname.model.QueryUserRequest;
+import top.openyuan.java.service.realname.model.QueryUserResponse;
 
-/** Native 支付下单为例 */
-public class QuickStart {
+import static top.openyuan.java.core.http.model.enums.HostName.QA_API;
 
-    /** 商户号 */
-    public static String merchantId = "190000****";
-    /** 商户API私钥路径 */
-    public static String privateKeyPath = "/Users/yourname/your/path/apiclient_key.pem";
-    /** 商户证书序列号 */
-    public static String merchantSerialNumber = "5157F09EFDC096DE15EBE81A47057A72********";
-    /** 商户APIV3密钥 */
-    public static String apiV3key = "...";
+public class UserServiceTest {
+    public static String appNo = "202207051436238006ks3k";
+    public static String merchantNo = "C1800000002";
+    public static String privateKeyStr="MIICdQIBADANBgkqhkiG9w0BAQEFAASCAl8wggJbAgEAAoGBALGdvRVucvnWYv4pPGaziuQ01lMvEz4S3ep7RgsGke6KAvI/Pufz5D2GQCcpUyPhJgU26RGLdUNDPWw6gp4TnnSjYSNm3ybCF6iVZ7l8f5rgjoeyBO83WwlkIVuT6FZwajk/yD9NFMfBu/96p5Kx5jyTF/CUvkXCMI98QfL5PaNDAgMBAAECgYACJX3bfHI3Qrf/ilAIjbLn/xt39eGtply4MLUv/OxWjaRreQgxlWj0tWKhFobCsD3dYkR+ycio/28Gl85sSqBnk0orjLKaWJRSV2oVvfZaJoYt4vZa3wl4go+S6N8ByeKpHzHYpC5YeXp0uHPFBoUF7OkLnHXTG2op1tVTPWJWwQJBANnoYFhEWXPt3x3BfOfKAPdfPQ/TBDjnM/rCtmiUJMqKKnT6c7xZc6jKoD5KT6Mb8O8GR4nSz6NGomswQyb04J0CQQDQqkS3SF0VtHqvG4T4PAeG0MZiw20hQENM5e1t8RJURoUkWXwKmDUfwNKoz9riKx8Oa/8uqF5yiyMMKuATtp1fAkBqTIODS4RfmzB2MYcfA1nJUrpU19l9cLvYndeh2HLCIvhnLC39OZ3EP2RAPrvuk5jK4UNQpngH7FMa+uYnQNm5AkAmSWesXZm+1su//4OpbJJQ+VO9YXBPrpPqszGaf6ZGUl4xqj2pT/5HYkEE+oaGAzWCluxOqlQSHleC7wcIdvRvAkAEsDrWITyINWa44xKjixyivm3AH8O4LmSzgdXw10POh22bibj2qJkwn7Dx3ym/7mwUlAPjS7Foo4loeJoBiRPz";
+    public static String publicKeyStr="MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCxnb0VbnL51mL+KTxms4rkNNZTLxM+Et3qe0YLBpHuigLyPz7n8+Q9hkAnKVMj4SYFNukRi3VDQz1sOoKeE550o2EjZt8mwheolWe5fH+a4I6HsgTvN1sJZCFbk+hWcGo5P8g/TRTHwbv/eqeSseY8kxfwlL5FwjCPfEHy+T2jQwIDAQAB";
+    public static UserService service;
 
     public static void main(String[] args) {
-        // 使用自动更新平台证书的RSA配置
-        // 一个商户号只能初始化一个配置，否则会因为重复的下载任务报错
-        Config config =
-                new RSAAutoCertificateConfig.Builder()
-                        .merchantId(merchantId)
-                        .privateKeyFromPath(privateKeyPath)
-                        .merchantSerialNumber(merchantSerialNumber)
-                        .apiV3Key(apiV3key)
+        // 初始化商户配置
+        HeLiPayConfig config =
+                new HeLiPayConfig.Builder()
+                        .appNo(appNo)
+                        .merchantNo(merchantNo)
+                        .publicKey(publicKeyStr)
+                        .privateKey(privateKeyStr)
                         .build();
-        // 构建service
-        NativePayService service = new NativePayService.Builder().config(config).build();
-        // request.setXxx(val)设置所需参数，具体参数可见Request定义
-        PrepayRequest request = new PrepayRequest();
-        Amount amount = new Amount();
-        amount.setTotal(100);
-        request.setAmount(amount);
-        request.setAppid("wxa9d9651ae******");
-        request.setMchid("190000****");
-        request.setDescription("测试商品标题");
-        request.setNotifyUrl("https://notify_url");
-        request.setOutTradeNo("out_trade_no_001");
-        // 调用下单方法，得到应答
-        PrepayResponse response = service.prepay(request);
-        // 使用微信扫描 code_url 对应的二维码，即可体验Native支付
-        System.out.println(response.getCodeUrl());
+
+        // 初始化服务
+        service = new UserService.Builder().hostName(QA_API).config(config).build();
+        // ... 调用接口
+        try {
+            QueryUserResponse response = queryUser();
+        } catch (HttpException e) { // 发送HTTP请求失败
+            // 调用e.getHttpRequest()获取请求打印日志或上报监控，更多方法见HttpException定义
+        } catch (ServiceException e) { // 服务返回状态小于200或大于等于300，例如500
+            // 调用e.getResponseBody()获取返回体打印日志或上报监控，更多方法见ServiceException定义
+        } catch (MalformedMessageException e) { // 服务返回成功，返回体类型不合法，或者解析返回体失败
+            // 调用e.getMessage()获取信息打印日志或上报监控，更多方法见MalformedMessageException定义
+        }
+    }
+    /** 查询用户状态 */
+    public static QueryUserResponse queryUser() {
+        QueryUserRequest request = new QueryUserRequest();
+        request.setPhone("13560011906");
+        // 调用request.setXxx(val)设置所需参数，具体参数可见Request定义
+        return service.queryUser(request);
     }
 }
 
+
 ```
 
-从示例可见，使用 SDK 不需要计算请求签名和验证应答签名。详细代码可从 [QuickStart](service/src/example/java/com/wechat/pay/java/service/QuickStart.java) 获得。
+从示例可见，使用 SDK 不需要计算请求签名和验证应答签名。详细代码可从 [QuickStart](http://192.168.42.37/liangzhengyuan/SDT) 获得。
 
 ## 示例
 
 ### 查询支付订单
 
 ```java
-QueryOrderByIdRequest queryRequest = new QueryOrderByIdRequest();
-queryRequest.setMchid("190000****");
-queryRequest.setTransactionId("4200001569202208304701234567");
 
-try {
-  Transaction result = service.queryOrderById(queryRequest);
-  System.out.println(result.getTradeState());
-} catch (ServiceException e) {
-  // API返回失败, 例如ORDER_NOT_EXISTS
-  System.out.printf("code=[%s], message=[%s]\n", e.getErrorCode(), e.getErrorMessage());
-  System.out.printf("reponse body=[%s]\n", e.getResponseBody());
-}
 ```
 
 ### 关闭订单
 
 ```java
-CloseOrderRequest closeRequest = new CloseOrderRequest();
-closeRequest.setMchid("190000****");
-closeRequest.setOutTradeNo("out_trade_no_001");
-// 方法没有返回值，意味着成功时API返回204 No Content
-service.closeOrder(closeRequest);
-```
 
-### 下单并生成调起支付的参数
-
-JSAPI 支付和 APP 支付推荐使用服务拓展类 [JsapiServiceExtension](https://github.com/wechatpay-apiv3/wechatpay-java/blob/main/service/src/main/java/com/wechat/pay/java/service/payments/jsapi/JsapiServiceExtension.java) 和 [AppServiceExtension](https://github.com/wechatpay-apiv3/wechatpay-java/blob/main/service/src/main/java/com/wechat/pay/java/service/payments/app/AppServiceExtension.java)，两者包含了下单并返回调起支付参数方法。
-
-```java
-JsapiServiceExtension service = new JsapiServiceExtension.Builder().config(config).build();
-
-// 跟之前下单示例一样，填充预下单参数
-PrepayRequest request = new PrepayRequest();
-
-// response包含了调起支付所需的所有参数，可直接用于前端调起支付
-PrepayWithRequestPaymentResponse response = service.prepayWithRequestPayment(request);
-```
-
-### 上传图片
-
-```java
-import com.wechat.pay.java.service.file.FileUploadService;
-import com.wechat.pay.java.service.file.model.FileUploadResponse;
-
-FileUploadService fileService = new FileUploadService.Builder().config(config).build();
-FileUploadResponse fileUploadResponse = fileUploadService.uploadImage(uploadUrl, meta, imagePath);
 ```
 
 ### 更多示例
 
-为了方便开发者快速上手，合利宝支付给每个服务生成了示例代码 `XxxServiceExample.java`，可以在 [example](service/src/example) 中查看。
+为了方便开发者快速上手，SDT给每个服务生成了示例代码 `XxxServiceExample.java`，可以在 [example](service/src/example) 中查看。
 例如：
 
 - [JsapiServiceExtensionExample.java](service/src/example/java/com/wechat/pay/java/service/payments/jsapi/JsapiServiceExtensionExample.java)
@@ -166,117 +152,21 @@ FileUploadResponse fileUploadResponse = fileUploadService.uploadImage(uploadUrl,
 
 SDK 使用的是 unchecked exception，会抛出四种自定义异常。每种异常发生的场景及推荐的处理方式如下：
 
-- [HttpException](core/src/main/java/com/wechat/pay/java/core/exception/HttpException.java)：调用合利宝支付服务，当发生 HTTP 请求异常时抛出该异常。
-  - 构建请求参数失败、发送请求失败、I/O错误：推荐上报监控和打印日志，并获取异常中的 HTTP 请求信息以定位问题。
-- [ValidationException](core/src/main/java/com/wechat/pay/java/core/exception/ValidationException.java) ：当验证合利宝支付签名失败时抛出该异常。
-  - 验证合利宝支付返回签名失败：上报监控和日志打印。
-  - 验证合利宝支付回调通知签名失败：确认输入参数与 HTTP 请求信息是否一致，若一致，说明该回调通知参数被篡改导致验签失败。
-- [ServiceException](core/src/main/java/com/wechat/pay/java/core/exception/ServiceException.java)：调用合利宝支付服务，发送 HTTP 请求成功，HTTP 状态码小于200或大于等于300。
-  - 状态码为5xx：主动重试。
-  - 状态码为其他：获取错误中的 `errorCode` 、`errorMessage`，上报监控和日志打印。
+- [HttpException](core/src/main/java/com/wechat/pay/java/core/exception/HttpException.java)：调用SDT服务，当发生 HTTP 请求异常时抛出该异常。
+    - 构建请求参数失败、发送请求失败、I/O错误：推荐上报监控和打印日志，并获取异常中的 HTTP 请求信息以定位问题。
+- [ValidationException](core/src/main/java/com/wechat/pay/java/core/exception/ValidationException.java) ：当验证SDT签名失败时抛出该异常。
+    - 验证SDT返回签名失败：上报监控和日志打印。
+    - 验证SDT回调通知签名失败：确认输入参数与 HTTP 请求信息是否一致，若一致，说明该回调通知参数被篡改导致验签失败。
+- [ServiceException](core/src/main/java/com/wechat/pay/java/core/exception/ServiceException.java)：调用SDT服务，发送 HTTP 请求成功，HTTP 状态码小于200或大于等于300。
+    - 状态码为5xx：主动重试。
+    - 状态码为其他：获取错误中的 `errorCode` 、`errorMessage`，上报监控和日志打印。
 - [MalformedMessageException](core/src/main/java/com/wechat/pay/java/core/exception/MalformedMessageException.java)：服务返回成功，返回内容异常。
-  - HTTP 返回 `Content-Type` 不为 `application/json`：不支持其他类型的返回体，[下载账单](#下载账单) 应使用 `download()` 方法。
-  - 解析 HTTP 返回体失败：上报监控和日志打印。
-  - 回调通知参数不正确：确认传入参数是否与 HTTP 请求信息一致，传入参数是否存在编码或者 HTML 转码问题。
-  - 解析回调请求体为 JSON 字符串失败：上报监控和日志打印。
-  - 解密回调通知内容失败：确认传入的 apiV3 密钥是否正确。
+    - HTTP 返回 `Content-Type` 不为 `application/json`：不支持其他类型的返回体，[下载账单](#下载账单) 应使用 `download()` 方法。
+    - 解析 HTTP 返回体失败：上报监控和日志打印。
+    - 回调通知参数不正确：确认传入参数是否与 HTTP 请求信息一致，传入参数是否存在编码或者 HTML 转码问题。
+    - 解析回调请求体为 JSON 字符串失败：上报监控和日志打印。
+    - 解密回调通知内容失败：确认传入的 apiV3 密钥是否正确。
 
-## 自动更新合利宝支付平台证书
-
-为确保 API 请求过程中的安全性，客户端需要使用合利宝支付平台证书来验证服务器响应的真实性和完整性。
-从 v0.2.3 版本开始，我们引入了一个名为 `RSAAutoCertificateConfig` 的配置类，用于自动更新平台证书。
-
-```java
-Config config =
-    new RSAAutoCertificateConfig.Builder()
-        .merchantId(merchantId)
-        .privateKeyFromPath(privateKeyPath)
-        .merchantSerialNumber(merchantSerialNumber)
-        .apiV3Key(apiV3key)
-        .build();
-```
-
-`RSAAutoCertificateConfig` 会利用 `AutoCertificateService` 自动下载合利宝支付平台证书。
-`AutoCertificateService` 将启动一个后台线程，定期（目前为每60分钟）更新证书，以实现证书过期时的平滑切换。
-
-在每次构建 `RSAAutoCertificateConfig` 时，SDK 首先会使用传入的商户参数下载一次合利宝支付平台证书。
-如果下载成功，SDK 会将商户参数注册或更新至 `AutoCertificateService`。若下载失败，将会抛出异常。
-
-为了提高性能，建议将配置类作为全局变量。
-复用 `RSAAutoCertificateConfig` 可以减少不必要的证书下载，避免资源浪费。
-只有在配置发生变更时，才需要重新构造 `RSAAutoCertificateConfig`。
-
-如果您有多个商户号，可以为每个商户构建相应的 `RSAAutoCertificateConfig`。
-
-> **Note**
-> 从 v0.2.10 开始，我们不再限制每个商户号只能创建一个 `RSAAutoCertificateConfig`。
-
-### 使用本地的合利宝支付平台证书
-
-如果你不想使用 SDK 提供的定时更新平台证书，你可以使用配置类 `RSAConfig` 加载本地证书。
-
-```java
-Config config =
-    new RSAConfig.Builder()
-        .merchantId(merchantId)
-        .privateKeyFromPath(privateKeyPath)
-        .merchantSerialNumber(merchantSerialNumber)
-        .wechatPayCertificatesFromPath(wechatPayCertificatePath)
-        .build();
-```
-
-## 回调通知验签和解密
-
-首先，你需要在你的服务器上创建一个公开的 HTTP 端点，接受来自合利宝支付的回调通知。
-当接收到回调通知，使用 [notification](core/src/main/java/com/wechat/pay/java/core/notification) 中的 `NotificationParser` 解析回调通知。
-
-具体步骤如下：
-
-1. 使用回调通知请求的数据，构建 `RequestParam`。
-    - HTTP 头 `Wechatpay-Signature`
-    - HTTP 头 `Wechatpay-Nonce`
-    - HTTP 头 `Wechatpay-Timestamp`
-    - HTTP 头 `Wechatpay-Serial`
-    - HTTP 头 `Wechatpay-Signature-Type`
-    - HTTP 请求体 body。切记使用原始报文，不要用 JSON 对象序列化后的字符串，避免验签的 body 和原文不一致。
-2. 初始化 `RSAAutoCertificateConfig`。合利宝支付平台证书由 SDK 的自动更新平台能力提供，也可以使用本地证书。
-3. 初始化 `NotificationParser`。
-4. 调用 `NotificationParser.parse()` 验签、解密并将 JSON 转换成具体的通知回调对象。
-
-```java
-// 构造 RequestParam
-RequestParam requestParam = new RequestParam.Builder()
-        .serialNumber(wechatPayCertificateSerialNumber)
-        .nonce(nonce)
-        .signature(signature)
-        .timestamp(timestamp)
-        .body(requestBody)
-        .build();
-
-// 如果已经初始化了 RSAAutoCertificateConfig，可直接使用
-// 没有的话，则构造一个
-NotificationConfig config = new RSAAutoCertificateConfig.Builder()
-        .merchantId(merchantId)
-        .privateKeyFromPath(privateKeyPath)
-        .merchantSerialNumber(merchantSerialNumber)
-        .apiV3Key(apiV3key)
-        .build();
-
-// 初始化 NotificationParser
-NotificationParser parser = new NotificationParser(config);
-
-// 以支付通知回调为例，验签、解密并转换成 Transaction
-Transaction transaction = parser.parse(requestParam, Transaction.class);
-```
-
-常用的通知回调对象类型：
-
-- 支付 `Transaction`
-- 退款 `RefundNotification`
-- 若 SDK 暂不支持的类型，请使用 `Map.class`，嵌套的 Json 对象将被转换成 `LinkedTreeMap`
-
-你既可以为每个通知回调使用不同的 HTTP 端点，也可以使用一个端点根据 `event_type` 处理不同的通知回调。
-我们建议，不同的通知回调使用不同的端点，直接调用 SDK 处理通知回调，避免商户自己解析报文。因为 SDK 会先验证通知回调的有效性，可有效防止"坏人"的报文攻击。
 
 ## 发送 HTTP 请求
 
@@ -290,22 +180,7 @@ Transaction transaction = parser.parse(requestParam, Transaction.class);
 
 [OkHttpClientAdapterTest](core/src/test/java/com/wechat/pay/java/core/http/OkHttpClientAdapterTest.java) 中演示了如何构造和发送 HTTP 请求。如果现有的 `OkHttpClientAdapter` 实现类不满足你的需求，可以继承 [AbstractHttpClient](core/src/main/java/com/wechat/pay/java/core/http/AbstractHttpClient.java) 拓展实现。
 
-### 下载账单
 
-因为下载的账单文件可能会很大，为了平衡系统性能和签名验签的实现成本，[账单下载API](https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_1_8.shtml) 被分成了两个步骤：
-
-1. `/v3/bill/tradebill` 申请账单下载链接，并获取账单摘要。
-1. `/v3/billdownload/file` 账单文件下载，请求需签名但应答不签名。
-
-SDK 提供了 `HttpClient.download()` 方法。它返回账单的输入流。开发者使用完输入流后，应自主关闭流。
-
-```java
-InputStream inputStream = httpClient.download(downloadUrl);
-
-// 非压缩的账单可使用 core.util.IOUtil 从流读入内存字符串，大账单请慎用
-String respBody = IOUtil.toString(inputStream);
-inputStream.close();
-```
 
 > **Warning**
 >
@@ -315,8 +190,8 @@ inputStream.close();
 
 为了保证通信过程中敏感信息字段（如用户的住址、银行卡号、手机号码等）的机密性，
 
-- 合利宝支付要求加密上送的敏感信息
-- 合利宝支付会加密下行的敏感信息
+- SDT要求加密上送的敏感信息
+- SDT会加密下行的敏感信息
 
 详见 [接口规则 - 敏感信息加解密](https://pay.weixin.qq.com/docs/merchant/development/interface-rules/sensitive-data-encryption.html)。
 
@@ -332,7 +207,7 @@ inputStream.close();
 如果是 SDK 尚未支持的接口，你可以使用 [cipher](core/src/main/java/com/wechat/pay/java/core/cipher) 中的 `RSAPrivacyEncryptor` 和 `RSAPrivacyDecryptor` ，手动对敏感信息加解密。
 
 ```java
-// 合利宝支付平台证书中的公钥
+// SDT平台证书中的公钥
 PublicKey wechatPayPublicKey = null;
 String plaintext = "";
 PrivacyEncryptor encryptor = new RSAPrivacyEncryptor(wechatPayPublicKey);
@@ -390,7 +265,7 @@ JsapiService service = new JsapiService.Builder().httpclient(httpClient).build()
 ### 双域名容灾
 
 为提升商户系统访问 API 的稳定性，SDK 实现了双域名容灾。如果主要域名 `api.mch.weixin.qq.com` 因网络问题无法访问，我们的 SDK 可自动切换到备用域名 `api2.wechatpay.cn` 重试当前请求。
-这个机制可以最大限度减少因合利宝支付 API 接入点故障或主域名问题(如 DNS 劫持)对商户系统的影响。
+这个机制可以最大限度减少因SDT API 接入点故障或主域名问题(如 DNS 劫持)对商户系统的影响。
 
 默认情况下，双域名容灾机制处于关闭状态，以避免重试降低商户系统的吞吐量。因为 OkHttp 默认会尝试主域名的多个IP地址(目前为2个)，增加备用域名重试很可能会提高异常情况下的处理时间。
 
@@ -420,67 +295,221 @@ JsapiService service = new JsapiService.Builder().httpclient(httpClient).build()
 
 开发者应该仔细评估自己的商户系统容量，根据自身情况选择合适的超时时间和重试策略，并做好监控和告警。
 
-## 使用国密
-
-我们提供基于 [腾讯 Kona 国密套件](https://github.com/Tencent/TencentKonaSMSuite) 的国密扩展。文档请参考 [shangmi/README.md](shangmi/README.md)。
-
-## 常见问题
-
-### 为什么收到应答中的证书序列号和发起请求的证书序列号不一致？
-
-请求和应答使用 [数字签名](https://zh.wikipedia.org/wiki/%E6%95%B8%E4%BD%8D%E7%B0%BD%E7%AB%A0) ，保证数据传递的真实、完整和不可否认。为了验签方能识别数字签名使用的密钥（特别是密钥和证书更换期间），合利宝支付 APIv3 要求签名和相应的证书序列号一起传输。
-
-- 商户请求使用**商户API私钥**签名。商户应上送商户证书序列号。
-- 合利宝支付应答使用**合利宝支付平台私钥**签名。合利宝支付应答返回合利宝支付平台证书序列号。
-
-综上所述，请求和应答的证书序列号是不一致的。
-
-### 如何获取合利宝支付平台证书的证书序列号？
-
-对请求中的敏感信息手动加密时，需要在请求的 HTTP 头部中传入加密使用证书的证书序列号。
-
-如果你是自动获取合利宝支付平台证书，可以通过以下方法获取证书序列号。
 
 ```java
 PrivacyEncryptor encryptor = config.createEncryptor();
 String wechatPayCertificateSerialNumber = encryptor.getWechatpaySerial();
 ```
 
-### 证书和回调解密需要的 AesGcm 解密在哪里？
+## 如何开发其他项目的sdk：依赖helipay-sdk-core包即可
+### 1.依赖helipay-sdk-core包
 
-请参考 [AeadAesCipher](core/src/main/java/com/wechat/pay/java/core/cipher/AeadAesCipher.java) 和 [AeadAesCipherTest](core/src/test/java/com/wechat/pay/java/core/cipher/AeadAesCipherTest.java) 。
+### 2.签名验签器；也可以使用默认的。
+以SDT签名验证器为例， 通过继承helipay-sdk-core：AbstractSignVerifyExecutor， 配置SDT签名验签算法即可；本例使用MD5withRSA算法。
+```java
+package top.openyuan.java.core.signverify;
 
-由于 SDK 已经提供了合利宝支付平台证书下载服务 `CertificateService` 以及回调通知解析器 `NotificationParser` ，这两者会完成所有的解析与解密工作。因此除非你想要自定义实现，否则你应该不需要用到 `AeadXxxCipher` 中提供的方法。
+import top.openyuan.java.core.signverify.enums.SignatureType;
 
-### 为什么我使用 `NotificationHandler` 验证回调通知失败，抛出 `ValidationException`？
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
-如果你使用的是 SDK 自动更新的合利宝支付平台证书，验证失败原因是：参与验证的参数不正确。从开发者反馈来看，大部分失败案例没有使用回调原始 body，而是用 body 反序列化得到的对象再做 JSON 序列化得到的 body。很遗憾，这样的 body 几乎一定跟原始报文**不一致**，所以签名验证不通过。具体案例可参考 [#112](https://github.com/wechatpay-apiv3/wechatpay-java/issues/112)。
+/**
+ * SDT签名验签器 
+ * 
+ * @author lzy 
+ */
+public class HeLiPaySignVerifyExecutor extends AbstractSignVerifyExecutor{
+    /**
+     * 初始化SDT签名验签器 
+     *
+     * @param publicKey SDT的公钥
+     * @param privateKey 商户的私钥
+     */
+    public HeLiPaySignVerifyExecutor(PublicKey publicKey, PrivateKey privateKey) {
+        super(SignatureType.MD5withRSA, publicKey, privateKey);
+    }
+}
 
-如果你使用的是本地的合利宝支付平台证书，请检查合利宝支付平台证书是否正确，不要把商户证书和合利宝支付平台证书搞混了。
+```
+### 3.实现请求凭证器和响应认证器。
+```java
+package top.openyuan.java.core.auth;
 
-### 如何计算前端签名？
+import com.alibaba.fastjson2.JSONObject;
+import top.openyuan.java.core.cipher.AsymmetricCipherExecutor;
+import top.openyuan.java.core.cipher.SymmetricCipherExecutor;
+import top.openyuan.java.core.cipher.enums.SecretKeyType;
+import top.openyuan.java.core.http.model.HttpRequest;
+import top.openyuan.java.core.http.model.data.JsonRequestBody;
+import top.openyuan.java.core.signverify.SignVerifyExecutor;
+import top.openyuan.java.core.util.NonceUtil;
 
-有一部分 API 需要计算前端签名，例如调起支付、调起支付分小程序等。
+import javax.crypto.spec.SecretKeySpec;
 
-- 调起支付签名，SDK 提供了下单并生成调起支付参数的方法，请参考 [示例](#下单并生成调起支付的参数)。
+/** SDT请求凭据生成器 */
+public final class HeLiPayCredential extends AbstractCredential {
+  private final String appNo;
+  private final String merchantNo;
+  private final SymmetricCipherExecutor symmetricCipherExecutor;
+  private final AsymmetricCipherExecutor asymmetricCipherExecutor;
+  private final SignVerifyExecutor signVerifyExecutor;
 
-- 其他场景计算签名，请参考 [JsapiServiceExtension](https://github.com/wechatpay-apiv3/wechatpay-java/blob/968a2ff8fb35c808f82827342abb100e30691a98/service/src/main/java/com/wechat/pay/java/service/payments/jsapi/JsapiServiceExtension.java#L59) 使用 [Signer](https://github.com/wechatpay-apiv3/wechatpay-java/blob/main/core/src/main/java/com/wechat/pay/java/core/cipher/Signer.java) 计算签名的例子。
+  public HeLiPayCredential(String appNo, String merchantNo,
+                           SymmetricCipherExecutor symmetricCipherExecutor,
+                           AsymmetricCipherExecutor asymmetricCipherExecutor,
+                           SignVerifyExecutor signVerifyExecutor){
+    this.appNo = appNo;
+    this.merchantNo = merchantNo;
+    this.symmetricCipherExecutor = symmetricCipherExecutor;
+    this.asymmetricCipherExecutor = asymmetricCipherExecutor;
+    this.signVerifyExecutor = signVerifyExecutor;
+  }
 
-### 为什么快速开始的示例程序执行后，程序不会退出？
+  @Override
+  public HttpRequest assembleHttpRequest(HttpRequest httpRequest) {
+    String body = getBody(httpRequest.getBody());
 
-在 v0.2.10 中，我们将定时更新证书的线程设置为后台线程，程序可以正常退出了。
+    String aesKey = NonceUtil.createNonce(16);
+    SecretKeySpec aesKeySpec = new SecretKeySpec(aesKey.getBytes(), SecretKeyType.AES.name());
 
-## 如何参与开发
+    String encryptData = symmetricCipherExecutor.encrypt(body, aesKeySpec);
+    String sign = signVerifyExecutor.sign(encryptData);
 
-合利宝支付欢迎来自社区的开发者贡献你们的想法和代码。请你在提交 PR 之前，先提一个对应的 issue 说明以下内容：
+    JSONObject reqBaseBody = new JSONObject();
+    reqBaseBody.fluentPut("data", encryptData);
+    reqBaseBody.fluentPut("encryptionKey", asymmetricCipherExecutor.encrypt(aesKey));
+    reqBaseBody.fluentPut("sign", sign);
+    reqBaseBody.fluentPut("signType", "RSA");
+    reqBaseBody.fluentPut("appNo", appNo);
+    reqBaseBody.fluentPut("parentMerchantNo", merchantNo);
 
-- 背景（如，遇到的问题）和目的。
-- **着重**说明你的想法。
-- 通过代码或者其他方式，简要的说明是如何实现的，或者它会是如何使用。
-- 是否影响现有的接口。
+    JsonRequestBody newBody = new JsonRequestBody.Builder().body(reqBaseBody.toJSONString()).build();
 
-## 联系合利宝支付
+    return new HttpRequest.Builder()
+            .url(httpRequest.getUrl())
+            .headers(httpRequest.getHeaders())
+            .httpMethod(httpRequest.getHttpMethod())
+            .body(newBody)
+            .build();
+  }
+}
 
-如果你发现了 BUG，或者需要的功能还未支持，或者有任何疑问、建议，欢迎通过 [issue](https://github.com/wechatpay-apiv3/wechatpay-java/issues) 反馈。
+```
+### 4.实现项目所需要的配置接口。
+```java
+package top.openyuan.java.core.config;
 
-也欢迎访问合利宝支付的 [开发者社区](https://developers.weixin.qq.com/community/pay)。
+import top.openyuan.java.core.auth.Credential;
+import top.openyuan.java.core.auth.HeLiPayCredential;
+import top.openyuan.java.core.auth.HeLiPayValidator;
+import top.openyuan.java.core.auth.Validator;
+import top.openyuan.java.core.cipher.AsymmetricCipherExecutor;
+import top.openyuan.java.core.cipher.HeLiPayAESCipherExecutor;
+import top.openyuan.java.core.cipher.HeLiPayRSACipherExecutor;
+import top.openyuan.java.core.cipher.SymmetricCipherExecutor;
+import top.openyuan.java.core.signverify.HeLiPaySignVerifyExecutor;
+import top.openyuan.java.core.signverify.SignVerifyExecutor;
+import top.openyuan.java.core.util.PemUtil;
+
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Security;
+
+import static top.openyuan.java.core.keypair.enums.KeyPairType.RSA;
+
+/**
+ * 合力付配置文件
+ *
+ * @author lzy
+ **/
+public class HeLiPayConfig extends AbstractConfig {
+  private final String appNo;
+  private final String merchantNo;
+  private final PublicKey publicKey;
+  private final PrivateKey privateKey;
+  private static volatile HeLiPayConfig instance;
+
+  protected HeLiPayConfig(String appNo, String merchantNo, PublicKey publicKey, PrivateKey privateKey) {
+    super(publicKey, privateKey);
+    this.appNo = appNo;
+    this.merchantNo = merchantNo;
+    this.publicKey = publicKey;
+    this.privateKey = privateKey;
+  }
+
+  public static HeLiPayConfig getInstance(String appNo, String merchantNo, PublicKey publicKey, PrivateKey privateKey) {
+    if (instance == null) {
+      synchronized (HeLiPayConfig.class) {
+        if (instance == null) {
+          instance = new HeLiPayConfig(appNo, merchantNo, publicKey, privateKey);
+        }
+      }
+    }
+    return instance;
+  }
+
+  @Override
+  public SymmetricCipherExecutor createSymmetricCipherExecutor() {
+    return new HeLiPayAESCipherExecutor();
+  }
+
+  @Override
+  public AsymmetricCipherExecutor createAsymmetricCipherExecutor() {
+    return new HeLiPayRSACipherExecutor(publicKey, privateKey);
+  }
+
+  @Override
+  public SignVerifyExecutor createSignVerifyExecutor() {
+    return new HeLiPaySignVerifyExecutor(publicKey, privateKey);
+  }
+
+  @Override
+  public Credential createCredential() {
+    return new HeLiPayCredential(appNo, merchantNo,
+            createSymmetricCipherExecutor(), createAsymmetricCipherExecutor(), createSignVerifyExecutor());
+  }
+
+  @Override
+  public Validator createValidator() {
+    return new HeLiPayValidator(createSymmetricCipherExecutor(), createAsymmetricCipherExecutor(), createSignVerifyExecutor());
+  }
+
+  public static class Builder extends AbstractConfigBuilder<Builder> {
+    static {
+      Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+    }
+    protected String appNo;
+    protected String merchantNo;
+
+    public Builder appNo(String appNo) {
+      this.appNo = appNo;
+      return this;
+    }
+    public Builder merchantNo(String merchantNo) {
+      this.merchantNo = merchantNo;
+      return this;
+    }
+
+    public Builder publicKey(String publicKey) {
+      this.publicKey = PemUtil.loadPublicKeyFromString(publicKey, RSA.name(), "BC");
+      return this;
+    }
+
+    public Builder privateKey(String privateKey) {
+      this.privateKey = PemUtil.loadPrivateKeyFromString(privateKey, RSA.name(), "BC");
+      return this;
+    }
+
+    @Override
+    protected Builder self() {
+      return this;
+    }
+
+    public HeLiPayConfig build(){
+      return HeLiPayConfig.getInstance(appNo, merchantNo, publicKey, privateKey);
+    }
+  }
+}
+
+```

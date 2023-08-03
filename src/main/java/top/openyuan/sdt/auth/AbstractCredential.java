@@ -4,7 +4,10 @@ import top.openyuan.sdt.http.model.data.FileRequestBody;
 import top.openyuan.sdt.http.model.data.JsonRequestBody;
 import top.openyuan.sdt.http.model.data.RequestBody;
 
-/** 抽象请求凭据生成器 */
+/** 抽象请求凭据生成器
+ *
+ * @author lzy
+ */
 public abstract class AbstractCredential implements Credential {
     /**
      * 获取body对应的数据

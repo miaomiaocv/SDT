@@ -1,5 +1,10 @@
 package top.openyuan.sdt.cipher.enums;
 
+/**
+ * 密钥类型
+ *
+ * @author lzy
+ */
 public enum SecretKeyType {
     /**对称加密key */
     AES,
